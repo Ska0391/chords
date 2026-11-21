@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Chords Player</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<script async src="https://www.scales-chords.com/api/scales-chords-api.js"></script>
+<style>
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    margin: 0;
+    padding: 10px;
+    background: var(--tg-theme-bg-color, #fff);
+    color: var(--tg-theme-text-color, #000);
+  }
+  #controls {
+    position: sticky;
+    top: 0;
+    background: var(--tg-theme-secondary-bg-color, #f0f0f0);
+    padding: 10px;
+    border-radius: 10px;
+    margin-bottom: 15px;
+    z-index: 100;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+  }
+  button, input[type=range] {
+    border-radius: 8px;
+    border: none;
+    padding: 8px 12px;
+    font-size: 14px;
+    background: var(--tg-theme-button-color, #3390ec);
+    color: var(--tg-theme-button-text-color, #fff);
+  }
+  #chords-content {
+    white-space: pre-wrap;
+    font-family: "Courier New", monospace;
+    font-size: 15px;
+    line-height: 1.4;
+    padding-bottom: 80vh;
+  }
+  .chord-diagrams {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: 20px;
+  }
+  .chord-diagrams ins {
+    display: inline-block;
+  }
+  #yt-container {
+    margin: 15px 0;
+    text-align: center;
+  }
+  iframe {
+    max-width: 100%;
+    border-radius: 10px;
+  }
+</style>
+</head>
+<body>
+<div id="controls">
+  <button id="playPause">▶️ Старт скролла</button>
+  <label>Скорость: <input type="range" id="speed" min="0.2" max="4" step="0.1" value="1"></label>
+  <span id="speedVal">1.0x</span>
+  <button id="reset">↺ В начало</button>
+</div>
+
+<h2 id="title">Загрузка...</h2>
+
+<div id="yt-container"></div>
+
+<div id="chords-content"></div>
+
+<div class="chord-diagrams" id="diagrams"></div>
+
+<script>
+const tg = window.Telegram.WebApp;
+tg.ready();
+tg.expand();
+
+const params = new URLSearchParams(window.location.search);
+const title = decodeURIComponent(params.get("title") || "Песня");
+const chordsRaw = decodeURIComponent(params.get("chords") || "Аккорды не переданы");
+const searchQuery = decodeURIComponent(params.get("query") || title);
+
+document.getElementById("title").textContent = title;
+document.getElementById("chords-content").textContent = chordsRaw;
+
+// YouTube embed search
+const ytQuery = encodeURIComponent(searchQuery + " official audio");
+const ytHtml = `<iframe width="100%" height="200" src="https://www.youtube.com/embed?listType=search&list=${ytQuery}&autoplay=0" frameborder="0" allow="autoplay; encrypted-media" allowfullscreen></iframe>`;
+document.getElementById("yt-container").innerHTML = ytHtml;
+
+// Extract unique chords for diagrams
+const chordRegex = /\b([A-G][#b]?(?:m|maj|min|sus|add|dim|aug)?[0-9]?(?:\/[A-G][#b]?)?)\b/g;
+const matches = chordsRaw.match(chordRegex) || [];
+const unique = [...new Set(matches)].slice(0, 12); // limit
+
+const diagramsDiv = document.getElementById("diagrams");
+unique.forEach(ch => {
+  const ins = document.createElement("ins");
+  ins.className = "scales_chords_api";
+  ins.setAttribute("chord", ch);
+  ins.setAttribute("instrument", "guitar");
+  ins.setAttribute("width", "120px");
+  diagramsDiv.appendChild(ins);
+});
+
+// Auto-scroll
+let scrolling = false;
+let scrollInterval;
+const speedInput = document.getElementById("speed");
+const speedVal = document.getElementById("speedVal");
+const playBtn = document.getElementById("playPause");
+
+speedInput.oninput = () => {
+  speedVal.textContent = speedInput.value + "x";
+  if (scrolling) restartScroll();
+};
+
+function restartScroll() {
+  clearInterval(scrollInterval);
+  const pxPerSec = 40 * parseFloat(speedInput.value); // базовая скорость
+  scrollInterval = setInterval(() => {
+    window.scrollBy(0, pxPerSec / 20);
+  }, 50);
+}
+
+playBtn.onclick = () => {
+  scrolling = !scrolling;
+  playBtn.textContent = scrolling ? "⏸ Пауза" : "▶️ Старт скролла";
+  if (scrolling) {
+    restartScroll();
+  } else {
+    clearInterval(scrollInterval);
+  }
+};
+
+document.getElementById("reset").onclick = () => {
+  window.scrollTo(0, 0);
+  if (scrolling) restartScroll();
+};
+
+// Close button
+tg.MainButton.setText("Закрыть");
+tg.MainButton.onClick(() => tg.close());
+tg.MainButton.show();
+</script>
+</body>
+</html>
